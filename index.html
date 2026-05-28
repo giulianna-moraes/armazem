@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Endereçamento Logístico</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-950 font-sans min-h-screen text-slate-100 grid-bg overflow-x-hidden">
+
+    <div class="max-w-[1700px] mx-auto p-4 lg:p-6">
+        
+        <header class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-2xl mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl lg:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                    <i class="fa-solid fa-warehouse text-indigo-500"></i> MAPA DE ESTOQUE INTEGRADO
+                </h1>
+                <p class="text-slate-400 text-xs mt-0.5">Busque por Marca ou por Código (Ex: R1-B1-A-3 ou R2-B2-D-1)</p>
+            </div>
+            
+            <div class="w-full md:w-96 relative">
+                <input type="text" id="search" placeholder="🔍 Buscar marca ou código (Ex: R1-B1-A-3)..." 
+                       class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner">
+                <div id="suggestions" class="absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl hidden z-50 overflow-hidden"></div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
+            
+            <div class="xl:col-span-1 space-y-4">
+                <div id="info-card" class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl transition-all duration-300">
+                    
+                    <div class="text-center py-8 text-slate-500" id="info-empty">
+                        <i class="fa-solid fa-map-location-dot text-4xl mb-3 block text-slate-700"></i>
+                        <p class="text-sm font-medium">Busque uma marca ou digite um código de endereço para localizar o produto no mapa.</p>
+                    </div>
+                    
+                    <div id="info-content" class="hidden space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <span id="prod-badge" class="text-xs font-bold uppercase px-3 py-1 rounded-full text-white">Setor</span>
+                            <span class="text-xs font-bold bg-indigo-950 text-indigo-300 border border-indigo-800 px-2.5 py-1 rounded-lg" id="tipo-busca-tag">Endereço Macro</span>
+                        </div>
+                        <h2 id="prod-nome" class="text-2xl font-black tracking-tight text-white">Marca</h2>
+                        
+                        <div class="space-y-3 bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
+                            <div class="grid grid-cols-3 gap-2 text-center font-bold text-slate-400">
+                                <div class="bg-slate-900 p-1 rounded border border-slate-800"><span class="block text-[8px] opacity-50">RUA</span><span id="lbl-rua">-</span></div>
+                                <div class="bg-slate-900 p-1 rounded border border-slate-800"><span class="block text-[8px] opacity-50">BLOCO</span><span id="lbl-bloco">-</span></div>
+                                <div class="bg-slate-900 p-1 rounded border border-slate-800"><span class="block text-[8px] opacity-50">PRAT.</span><span id="lbl-prat">-</span></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-center font-bold text-slate-400">
+                                <div class="bg-slate-900 p-1 rounded border border-slate-800"><span class="block text-[8px] opacity-50">ANDAR ALVO</span><span id="lbl-andar">-</span></div>
+                                <div class="bg-slate-900 p-1 rounded border border-slate-800"><span class="block text-[8px] opacity-50">POSIÇÃO (APT)</span><span id="lbl-apt">01 ao 06</span></div>
+                            </div>
+                            <div class="border-t border-slate-900 pt-2 text-center text-[10px] text-indigo-400 font-mono">
+                                <span class="block text-[8px] text-slate-500 font-sans font-bold">CÓDIGO DE LOCALIZAÇÃO:</span>
+                                <span id="addr-completo" class="text-sm font-black tracking-wider text-emerald-400">-</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-indigo-950/30 p-4 rounded-xl border border-indigo-900/50 space-y-2">
+                            <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+                                <i class="fa-solid fa-angles-right"></i> Guia do Operador:
+                            </h4>
+                            <ol class="text-xs text-slate-300 space-y-2 list-decimal list-inside" id="route-steps"></ol>
+                        </div>
+                        
+                        <button onclick="clearSelection()" class="w-full text-center text-xs text-rose-400 hover:text-rose-300 font-medium py-2 transition-colors cursor-pointer">
+                            Limpar Filtro
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="xl:col-span-3 bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl relative min-h-[750px] flex flex-col justify-between">
+                
+                <div class="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center z-20 bg-slate-950 border border-slate-800 px-2.5 py-3.5 rounded-xl shadow-2xl pointer-events-none">
+                    <i class="fa-solid fa-door-open text-emerald-400 text-sm mb-1 animate-pulse"></i>
+                    <span class="text-[7.5px] font-black text-slate-400 tracking-widest block uppercase">ENTRADA</span>
+                    <i class="fa-solid fa-arrow-right text-emerald-400 text-[10px] mt-1.5"></i>
+                </div>
+
+                <div class="absolute left-16 top-4 bottom-4 w-4 border-l border-dashed border-slate-800 flex flex-col justify-between items-center py-20 pointer-events-none text-slate-700 text-xs">
+                    <i class="fa-solid fa-arrow-up animate-pulse"></i>
+                    <i class="fa-solid fa-arrow-up animate-pulse"></i>
+                    <i class="fa-solid fa-arrow-down animate-pulse"></i>
+                    <i class="fa-solid fa-arrow-down animate-pulse"></i>
+                </div>
+
+                <div class="pl-20 h-full flex flex-col justify-between" id="warehouse-grid">
+                    
+                    <div class="grid grid-cols-2 gap-8 mb-2">
+                        <div>
+                            <div class="bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 py-1.5 rounded-xl text-center font-black text-xs tracking-widest uppercase mb-2">
+                                <i class="fa-solid fa-print"></i> Setor Impressoras
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 text-center">
+                                <div class="text-[10px] font-black text-slate-500 tracking-wider bg-slate-950 py-0.5 rounded border border-slate-800/60">BLOCO 1</div>
+                                <div class="text-[10px] font-black text-slate-500 tracking-wider bg-slate-950 py-0.5 rounded border border-slate-800/60">BLOCO 2</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="bg-teal-600/10 text-teal-400 border border-teal-500/20 py-1.5 rounded-xl text-center font-black text-xs tracking-widest uppercase mb-2">
+                                <i class="fa-solid fa-desktop"></i> Setor Computadores
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 text-center">
+                                <div class="text-[10px] font-black text-slate-500 tracking-wider bg-slate-950 py-0.5 rounded border border-slate-800/60">BLOCO 1</div>
+                                <div class="text-[10px] font-black text-slate-500 tracking-wider bg-slate-950 py-0.5 rounded border border-slate-800/60">BLOCO 2</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="relative corridor-row border-slate-800 bg-slate-950/20 mb-3" id="area-R1">
+                        <div class="street-tag border-slate-800 text-slate-400">R1</div>
+                        <div id="arrow-R1" class="route-arrow hidden absolute left-2 top-1/2 -translate-y-1/2 text-2xl text-rose-500 z-20"><i class="fa-solid fa-circle-arrow-right"></i></div>
+                        
+                        <div class="grid grid-cols-2 gap-8">
+                            <div class="grid grid-cols-2 gap-3 transition-all duration-300 p-1 rounded-xl border-2 border-transparent" id="shelf-R1-IMP">
+                                <div class="relative"><div class="side-letter">A</div><div id="R1-IMP-A"></div></div>
+                                <div class="relative"><div class="side-letter">B</div><div id="R1-IMP-B"></div></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 transition-all duration-300 p-1 rounded-xl border-2 border-transparent" id="shelf-R1-COMP">
+                                <div class="relative"><div class="side-letter text-teal-500">C</div><div id="R1-COMP-C"></div></div>
+                                <div class="relative"><div class="side-letter text-teal-500">D</div><div id="R1-COMP-D"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="relative corridor-row border-slate-800 bg-slate-950/20 mb-3" id="area-R2">
+                        <div class="street-tag border-slate-800 text-slate-400">R2</div>
+                        <div id="arrow-R2" class="route-arrow hidden absolute left-2 top-1/2 -translate-y-1/2 text-2xl text-amber-500 z-20"><i class="fa-solid fa-circle-arrow-right"></i></div>
+                        
+                        <div class="grid grid-cols-2 gap-8">
+                            <div class="grid grid-cols-2 gap-3 transition-all duration-300 p-1 rounded-xl border-2 border-transparent" id="shelf-R2-IMP">
+                                <div class="relative"><div class="side-letter">A</div><div id="R2-IMP-A"></div></div>
+                                <div class="relative"><div class="side-letter">B</div><div id="R2-IMP-B"></div></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 transition-all duration-300 p-1 rounded-xl border-2 border-transparent" id="shelf-R2-COMP">
+                                <div class="relative"><div class="side-letter text-teal-500">C</div><div id="R2-COMP-C"></div></div>
+                                <div class="relative"><div class="side-letter text-teal-500">D</div><div id="R2-COMP-D"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="w-full h-12 my-2 flex items-center justify-around border-y border-slate-900 bg-slate-950/40 rounded-xl px-10 text-slate-700 pointer-events-none">
+                        <span class="text-[9px] font-bold tracking-widest uppercase flex items-center gap-2"><i class="fa-solid fa-arrow-left"></i> FLUXO PRINCIPAL DE EMPILHADEIRAS <i class="fa-solid fa-arrow-right"></i></span>
+                        <span class="text-[9px] font-bold tracking-widest uppercase flex items-center gap-2"><i class="fa-solid fa-arrow-left"></i> TRÂNSITO LIVRE DE PALETES <i class="fa-solid fa-arrow-right"></i></span>
+                    </div>
+
+                    <div class="relative corridor-row border-slate-800 bg-slate-950/20 mb-3" id="area-R3">
+                        <div class="street-tag border-slate-800 text-slate-400">R3</div>
+                        <div id="arrow-R3" class="route-arrow hidden absolute left-2 top-1/2 -translate-y-1/2 text-2xl text-emerald-500 z-20"><i class="fa-solid fa-circle-arrow-right"></i></div>
+                        
+                        <div class="grid grid-cols-2 gap-8">
+                            <div class="grid grid-cols-2 gap-3 transition-all duration-300 p-1 rounded-xl border-2 border-transparent" id="shelf-R3-IMP">
+                                <div class="relative"><div class="side-letter">A</div><div id="R3-IMP-A"></div></div>
+                                <div class="relative"><div class="side-letter">B</div><div id="R3-IMP-B"></div></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 transition-all duration-300 p-1 rounded-xl border-2 border-transparent" id="shelf-R3-COMP">
+                                <div class="relative"><div class="side-letter text-teal-500">C</div><div id="R3-COMP-C"></div></div>
+                                <div class="relative"><div class="side-letter text-teal-500">D</div><div id="R3-COMP-D"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="relative corridor-row border-slate-800 bg-slate-950/20" id="area-R4">
+                        <div class="street-tag border-slate-800 text-slate-400">R4</div>
+                        <div id="arrow-R4" class="route-arrow hidden absolute left-2 top-1/2 -translate-y-1/2 text-2xl text-blue-500 z-20"><i class="fa-solid fa-circle-arrow-right"></i></div>
+                        
+                        <div class="grid grid-cols-2 gap-8">
+                            <div class="grid grid-cols-2 gap-3 transition-all duration-300 p-1 rounded-xl border-2 border-transparent" id="shelf-R4-IMP">
+                                <div class="relative"><div class="side-letter">A</div><div id="R4-IMP-A"></div></div>
+                                <div class="relative"><div class="side-letter">B</div><div id="R4-IMP-B"></div></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 transition-all duration-300 p-1 rounded-xl border-2 border-transparent" id="shelf-R4-COMP">
+                                <div class="relative"><div class="side-letter text-teal-500">C</div><div id="R4-COMP-C"></div></div>
+                                <div class="relative"><div class="side-letter text-teal-500">D</div><div id="R4-COMP-D"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
